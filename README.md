@@ -1,6 +1,6 @@
 # 待办事项管理（SQLite）
 
-需要 JDK 17 或更高版本。项目附带 Maven Wrapper，无需单独安装 Maven；首次构建需要联网下载 Maven 和依赖。
+需要 JDK 25（最新 LTS）或更高版本。项目附带 Maven Wrapper，无需单独安装 Maven；首次构建需要联网下载 Maven 和依赖。
 
 源码位于 `src/main/java/task/`，测试位于 `src/test/java/task/`，统一使用 `task` 包；应用入口为 `task.Main`。
 
