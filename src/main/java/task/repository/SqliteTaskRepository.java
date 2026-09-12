@@ -1,4 +1,7 @@
-package task;
+package task.repository;
+
+import task.model.Task;
+import task.exception.TaskStorageException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,7 +41,7 @@ public final class SqliteTaskRepository implements TaskRepository {
                         """);
             }
         } catch (IOException | SQLException e) {
-            throw new TaskStorageException("无法初始化任务数据库：" + absolutePath, e);
+            throw new TaskStorageException("无法初始化任务数据库，请检查存储配置和访问权限", e);
         }
     }
 
@@ -51,9 +54,7 @@ public final class SqliteTaskRepository implements TaskRepository {
     @Override
     public Task add(Task task) {
         Objects.requireNonNull(task);
-        if (task.getId() != 0 || task.isCompleted()) {
-            throw new IllegalArgumentException("只能添加尚未保存且未完成的新任务");
-        }
+        task.requireNew();
         // 插入和返回编号使用同一条语句，避免并发查询 MAX(id) 的竞争。
         String sql = """
                 INSERT INTO tasks (content, creator, method, start_time, end_time, completed)
@@ -89,15 +90,48 @@ public final class SqliteTaskRepository implements TaskRepository {
 
     @Override
     public List<Task> findIncomplete() {
+        return findTasks(false);
+    }
+
+    @Override
+    public List<Task> findAll() {
+        return findTasks(null);
+    }
+
+    @Override
+    public List<Task> findCompleted() {
+        return findTasks(true);
+    }
+
+    private List<Task> findTasks(Boolean completed) {
+        String sql = completed == null ? "SELECT * FROM tasks ORDER BY id"
+                : "SELECT * FROM tasks WHERE completed = ? ORDER BY id";
         try (Connection connection = open();
-             PreparedStatement statement = connection.prepareStatement(
-                     "SELECT * FROM tasks WHERE completed = 0 ORDER BY id");
-             ResultSet rows = statement.executeQuery()) {
-            List<Task> tasks = new ArrayList<>();
-            while (rows.next()) tasks.add(readTask(rows));
-            return List.copyOf(tasks);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (completed != null) statement.setBoolean(1, completed);
+            try (ResultSet rows = statement.executeQuery()) {
+                List<Task> tasks = new ArrayList<>();
+                while (rows.next()) tasks.add(readTask(rows));
+                return List.copyOf(tasks);
+            }
         } catch (SQLException e) {
-            throw new TaskStorageException("查询未完成任务失败", e);
+            throw new TaskStorageException("查询任务列表失败", e);
+        }
+    }
+
+    @Override
+    public boolean update(long id, String content, String creator,
+                          LocalDateTime endTime, boolean completed) {
+        String sql = "UPDATE tasks SET content = ?, creator = ?, end_time = ?, completed = ? WHERE id = ?";
+        try (Connection connection = open(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, content);
+            statement.setString(2, creator);
+            statement.setString(3, endTime.toString());
+            statement.setBoolean(4, completed);
+            statement.setLong(5, id);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new TaskStorageException("修改任务失败", e);
         }
     }
 
@@ -110,6 +144,17 @@ public final class SqliteTaskRepository implements TaskRepository {
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new TaskStorageException("更新任务状态失败", e);
+        }
+    }
+
+    @Override
+    public boolean delete(long id) {
+        try (Connection connection = open();
+             PreparedStatement statement = connection.prepareStatement("DELETE FROM tasks WHERE id = ?")) {
+            statement.setLong(1, id);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new TaskStorageException("删除任务失败", e);
         }
     }
 

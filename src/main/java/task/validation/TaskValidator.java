@@ -1,19 +1,9 @@
-package task;
+package task.validation;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.ResolverStyle;
 
 public final class TaskValidator {
-    private static final DateTimeFormatter END_TIME_FORMATTER = DateTimeFormatter
-            .ofPattern("uuuu-MM-dd HH:mm")
-            .withResolverStyle(ResolverStyle.STRICT);
-
     private TaskValidator() {
-    }
-
-    public static LocalDateTime parseEndTime(String input) {
-        return LocalDateTime.parse(input, END_TIME_FORMATTER);
     }
 
     public static String requireNonBlank(String value, String fieldName) {
@@ -21,6 +11,14 @@ public final class TaskValidator {
             throw new IllegalArgumentException(fieldName + "不能为空");
         }
         return value.trim();
+    }
+
+    public static void validateUpdatedEndTime(LocalDateTime endTime, LocalDateTime originalEndTime) {
+        if (endTime == null) throw new IllegalArgumentException("截止时间不能为空");
+        // 允许保留已过期的原截止时间，以便单独修改内容或完成状态。
+        if (!endTime.equals(originalEndTime) && !endTime.isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("新的截止时间必须晚于当前时间");
+        }
     }
 
     public static ValidatedParameters validate(

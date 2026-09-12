@@ -1,4 +1,6 @@
-package task;
+package task.model;
+
+import task.validation.TaskValidator;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -35,8 +37,21 @@ public final class Task {
         return id;
     }
 
+    public void requireNew() {
+        if (id != 0 || completed) {
+            throw new IllegalArgumentException("只能添加尚未保存且未完成的新任务");
+        }
+    }
+
+    public Task withUpdates(String content, String creator, LocalDateTime endTime, boolean completed) {
+        String validContent = TaskValidator.requireNonBlank(content, "任务内容");
+        String validCreator = TaskValidator.requireNonBlank(creator, "创建者");
+        TaskValidator.validateUpdatedEndTime(endTime, this.endTime);
+        return new Task(id, validContent, validCreator, method, startTime, endTime, completed);
+    }
+
     // 历史任务可以过期，不能重新执行新建任务的期限校验。
-    static Task restore(long id, String content, String creator, String method,
+    public static Task restore(long id, String content, String creator, String method,
                         LocalDateTime startTime, LocalDateTime endTime, boolean completed) {
         return new Task(id, content, creator, method, startTime, endTime, completed);
     }
@@ -75,21 +90,6 @@ public final class Task {
 
     public boolean isCompleted() {
         return completed;
-    }
-
-    // 完成副本保留原任务身份及时间，不重新校验期限或分配编号。
-    private Task(Task original) {
-        this.content = original.content;
-        this.creator = original.creator;
-        this.method = original.method;
-        this.id = original.id;
-        this.startTime = original.startTime;
-        this.endTime = original.endTime;
-        this.completed = true;
-    }
-
-    public Task withCompleted() {
-        return completed ? this : new Task(this);
     }
 
 }
